@@ -1,0 +1,72 @@
+name: STM32F411RE Validation with Renode
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        
+    - name: Setup Mono (required for Renode)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y mono-complete wget
+        
+    - name: Install Dependencies
+      run: |
+        sudo apt-get install -y gcc-arm-none-eabi gdb-multiarch cmake
+        
+    - name: Download and Install Renode
+      run: |
+        RENODE_VERSION="1.16.1"
+        wget "https://github.com/renode/renode/releases/download/v${RENODE_VERSION}/renode-${RENODE_VERSION}.linux-portable.tar.gz"
+        tar -xzf "renode-${RENODE_VERSION}.linux-portable.tar.gz"
+        sudo rm -f /usr/local/bin/renode
+        sudo rm -f /usr/local/bin/renode
+        sudo cp "renode_1.16.1_portable/renode" /usr/local/bin/
+        sudo cp -r "renode_1.16.1_portable/platforms" /usr/local/bin/
+        renode --version
+        
+    - name: Verify Renode Installation
+      run: |
+        which renode
+        renode --version
+        
+    - name: Build STM32 Project
+      run: |
+        cmake -B build
+        cmake --build build
+        
+    - name: Verify Build Output
+      run: |
+        ls -la build/
+        file build/GPIO_InfiniteLedToggling.elf
+        file build/GPIO_InfiniteLedToggling.bin
+        
+    - name: Run Renode Validation
+      run: |
+        chmod +x validate_renode.sh
+        ./validate_renode.sh
+        
+    - name: Upload Build Artifacts (optional)
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifacts
+        path: |
+          build/
+          *.log
+        retention-days: 7

@@ -1,0 +1,76 @@
+# Configuração Renode para STM32F411RE - Versão Simplificada
+# Baseado na documentação oficial e adaptado para este projeto
+
+# Incluir plataforma STM32F4
+using sysbus
+using mach.st.stm32f4
+
+# Criar instância do STM32F411
+stm32: STM32F411 @ sysbus
+
+# Mapeamento de memória STM32F411RE
+sysbus:
+    # Flash memory (512KB)
+    map 0x08000000, 0x00080000
+    # SRAM memory (128KB) 
+    map 0x20000000, 0x00020000
+    # Periféricos AHB1
+    map 0x40020000, 0x00000400  # GPIOB
+    map 0x40023800, 0x00000400  # RCC
+
+# Configurar CPU Cortex-M4
+cpu:
+    # Clock inicial (será configurado pelo software)
+    ClockFrequency: 16000000
+    # Porta GDB para debug
+    GdbPort: 3333
+    # Iniciar halted para debug
+    IsHalted: true
+
+# Configuração GPIOB para LEDs virtuais
+gpioB:
+    $name = "GPIOB"  # Nome para identificação
+    $address = 0x40020000
+    
+    # LEDs virtuais nos pins PB8 e PB9
+    led1:
+        $name = "LED_PB8"
+        PinNumber = 8
+        Type = "GPIO"
+        
+    led2:
+        $name = "LED_PB9" 
+        PinNumber = 9
+        Type = "GPIO"
+
+# Configuração do RCC (Reset and Clock Control)
+rcc:
+    $name = "RCC"
+    $address = 0x40023800
+    
+    # Valores iniciais dos registradores
+    CR = 0x00000000        # Control register
+    PLLCFGR = 0x24003010  # PLL configuration
+    CFGR = 0x00000000      # Clock configuration  
+    CIR = 0x00000000       # Clock interrupt
+    AHB1ENR = 0x00100000   # AHB1 enable (GPIOB clock desabilitado inicialmente)
+    APB1ENR = 0x00000000   # APB1 enable
+    APB2ENR = 0x00000000   # APB2 enable
+
+# Carregar o binário compilado
+sysbus LoadBinary @build/GPIO_InfiniteLedToggling.bin 0x08000000
+
+# Configurar ponto de entrada
+cpu:
+    PC: 0x08000000
+
+# Logging para debug (opcional, comentar se não necessário)
+# sysbus:
+#     LogConnectionString = "tcp://localhost:4242"
+#     LogLevel: Debug
+
+# Mensagem de inicialização
+echo "STM32F411RE configurado com Renode"
+echo "Binary carregado: build/GPIO_InfiniteLedToggling.bin"
+echo "GDB disponível na porta 3333"
+echo "LEDs virtuais: PB8, PB9"

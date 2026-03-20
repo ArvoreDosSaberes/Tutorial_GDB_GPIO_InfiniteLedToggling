@@ -1,0 +1,18 @@
+# Tutorial Completo de Desenvolvimento STM32F411RETx: Compilação, Depuração, Simulação e CI/CD
+
+![visitors](https://visitor-badge.laobi.icu/badge?page_id=ArvoreDosSaberes.Tutorial_GDB_GPIO_InfiniteLedToggling.TUTORIAL)
+[![License: CC BY-SA 4.0](https://img.shields.io/badge/License-CC_BY--SA_4.0-blue.svg)](https://creativecommons.org/licenses/by-sa/4.0/)
+![Language: Portuguese](https://img.shields.io/badge/Language-Portuguese-brightgreen.svg)
+![STM32](https://img.shields.io/badge/STM32-F411RETx-blue)
+![GDB](https://img.shields.io/badge/GDB-Debug-orange)
+![Renode](https://img.shields.io/badge/Renode-Simulation-green)
+![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-purple)
+![Status](https://img.shields.io/badge/Status-Complete_Tutorial-brightgreen)
+
+*Publicado em mcu.tec.br*
+
+#*Este tutorial completo foi desenvolvido para a comunidade mcu.tec.br, contribuindo para o avanço do desenvolvimento de sistemas embarcados com práticas modernas e profissionais. Contribuições e sugestões são bem-vindas através do repositório GitHub!*
+
+**Repositório**: https://github.com/ArvoreDosSaberes/Tutorial_GDB_GPIO_InfiniteLedToggling
+
+> 
