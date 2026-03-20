@@ -22,9 +22,12 @@ O código-fonte completo e os exemplos práticos estão disponíveis no reposit�
 ## Pré-requisitos
 
 ### Hardware
-- STM32F411RETx (Nucleo-F411RE ou placa compatível)
+- **Placa de teste**: STM32F411RETx (Nucleo-F411RE)
+- **Compatibilidade**: Qualquer placa STM32F4xx (F401, F405, F407, F410, F411, F412, F413, F429, F446, etc.)
 - ST-Link V2/V3 (integrado no Nucleo ou externo)
 - Cabo USB
+
+> **Importante**: O código é compatível com qualquer placa da família STM32F4xx, mas você deve observar e ajustar os pinos dos LEDs conforme sua placa específica. O exemplo usa PA.05 (LED2) da Nucleo-F411RE.
 
 ### Software
 - Toolchain ARM GCC (arm-none-eabi-gcc)
@@ -103,16 +106,312 @@ O GDB opera em dois modos principais:
 - `print <variável>`: Mostra valor de variável
 - `backtrace`: Mostra pilha de chamadas
 
+## Scripts de Automação - Explicação Detalhada
+
+> **Importante**: Os scripts foram criados para facilitar o desenvolvimento, mas é fundamental entender cada comando individualmente. Esta seção explica detalhadamente o que cada script faz e quais comandos estão sendo executados.
+
+### Script build.sh - Compilação do Projeto
+
+**Objetivo**: Automatizar o processo de compilação usando CMake
+
+```bash
+#!/bin/bash
+set -e  # Para em caso de erro
+
+# Verificação de ferramentas
+if ! command -v arm-none-eabi-gcc &> /dev/null; then
+    echo "ERRO: arm-none-eabi-gcc não encontrado!"
+    exit 1
+fi
+
+# Criação do diretório de build
+BUILD_DIR="build"
+rm -rf "$BUILD_DIR"  # Limpa build anterior
+mkdir -p "$BUILD_DIR"
+cd "$BUILD_DIR"
+
+# Configuração CMake
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+
+# Compilação
+make -j$(nproc)  # Usa todos os cores do CPU
+```
+
+**Comandos explicados:**
+- `set -e`: Interrompe o script se qualquer comando falhar
+- `command -v`: Verifica se um programa está instalado
+- `rm -rf "$BUILD_DIR"`: Remove completamente o diretório de build anterior
+- `mkdir -p "$BUILD_DIR"`: Cria o diretório de build
+- `cmake .. -DCMAKE_BUILD_TYPE=Debug`: Configura o projeto com informações de debug
+- `make -j$(nproc)`: Compila usando paralelismo (nproc = número de CPUs)
+
+**Equivalente manual:**
+```bash
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+make -j4  # Se tiver 4 CPUs
+```
+
+### Script flash.sh - Gravação no Dispositivo
+
+**Objetivo**: Gravar o firmware no STM32 usando OpenOCD
+
+```bash
+#!/bin/bash
+set -e
+
+# Verificação do OpenOCD
+if ! command -v openocd &> /dev/null; then
+    echo "ERRO: openocd não encontrado!"
+    exit 1
+fi
+
+# Verificação do arquivo ELF
+if [ ! -f "build/GPIO_InfiniteLedToggling.elf" ]; then
+    echo "ERRO: GPIO_InfiniteLedToggling.elf não encontrado!"
+    exit 1
+fi
+
+# Comando principal do OpenOCD
+openocd \
+    -f interface/stlink.cfg \
+    -f target/stm32f4x.cfg \
+    -c "program build/GPIO_InfiniteLedToggling.elf verify reset exit"
+```
+
+**Comandos explicados:**
+- `openocd`: Ferramenta de debug para microcontroladores
+- `-f interface/stlink.cfg`: Especifica o adaptador de debug (ST-Link)
+- `-f target/stm32f4x.cfg`: Especifica o microcontrolador alvo
+- `-c "program ..."`: Executa comandos OpenOCD
+  - `program build/GPIO_InfiniteLedToggling.elf`: Grava o arquivo ELF
+  - `verify`: Verifica se a gravação foi bem-sucedida
+  - `reset`: Reseta o microcontrolador
+  - `exit`: Encerra o OpenOCD
+
+**Equivalente manual:**
+```bash
+openocd -f interface/stlink.cfg -f target/stm32f4x.cfg \
+  -c "program build/GPIO_InfiniteLedToggling.elf verify reset exit"
+```
+
+### Script debug.sh - Sessão de Debug Completa
+
+**Objetivo**: Iniciar OpenOCD e GDB automaticamente para depuração
+
+```bash
+#!/bin/bash
+set -e
+
+# Função de limpeza
+cleanup() {
+    if [ ! -z "$OPENOCD_PID" ]; then
+        kill $OPENOCD_PID 2>/dev/null || true
+    fi
+}
+trap cleanup SIGINT SIGTERM  # Executa cleanup ao sair
+
+# Iniciar OpenOCD em background
+openocd -f interface/stlink.cfg -f target/stm32f4x.cfg > openocd.log 2>&1 &
+OPENOCD_PID=$!
+
+# Aguardar inicialização
+sleep 3
+
+# Verificar conexão
+if ! nc -z localhost 3333 2>/dev/null; then
+    echo "ERRO: OpenOCD não está escutando na porta 3333!"
+    exit 1
+fi
+
+# Iniciar GDB
+cd build
+arm-none-eabi-gdb GPIO_InfiniteLedToggling.elf \
+    -ex "target remote localhost:3333" \
+    -ex "monitor reset init"
+```
+
+**Comandos explicados:**
+- `trap cleanup SIGINT SIGTERM`: Configura limpeza automática ao sair (Ctrl+C)
+- `openocd ... > openocd.log 2>&1 &`: Inicia OpenOCD em background, redirecionando output para log
+- `OPENOCD_PID=$!`: Salva o PID do processo OpenOCD
+- `sleep 3`: Aguarda 3 segundos para OpenOCD inicializar
+- `nc -z localhost 3333`: Verifica se a porta 3333 está aberta (conexão GDB)
+- `arm-none-eabi-gdb ... -ex "..."`: Inicia GDB com comandos automáticos
+  - `-ex "target remote localhost:3333"`: Conecta ao servidor GDB remoto
+  - `-ex "monitor reset init"`: Reseta e inicializa o microcontrolador
+
+**Equivalente manual (2 terminais):**
+```bash
+# Terminal 1
+openocd -f interface/stlink.cfg -f target/stm32f4x.cfg
+
+# Terminal 2
+cd build
+arm-none-eabi-gdb GPIO_InfiniteLedToggling.elf
+(gdb) target remote localhost:3333
+(gdb) monitor reset init
+```
+
+### CMakeLists.txt - Configuração do Build
+
+**Objetivo**: Definir como o projeto deve ser compilado
+
+```cmake
+# Configuração básica
+cmake_minimum_required(VERSION 3.20)
+project(GPIO_InfiniteLedToggling)
+
+# Sistema e processador
+set(CMAKE_SYSTEM_NAME Generic)  # Sistema genérico (sem OS)
+set(CMAKE_SYSTEM_PROCESSOR ARM)  # Processador ARM
+
+# Toolchain ARM
+set(CROSS_COMPILE arm-none-eabi-)
+set(CMAKE_C_COMPILER ${CROSS_COMPILE}gcc)
+set(CMAKE_ASM_COMPILER ${CROSS_COMPILE}gcc)
+set(CMAKE_OBJCOPY ${CROSS_COMPILE}objcopy)
+```
+
+**Comandos explicados:**
+- `cmake_minimum_required(VERSION 3.20)`: Requer CMake versão 3.20 ou superior
+- `project(GPIO_InfiniteLedToggling)`: Define o nome do projeto
+- `set(CMAKE_SYSTEM_NAME Generic)`: Indica que é um sistema embarcado (sem OS)
+- `set(CMAKE_SYSTEM_PROCESSOR ARM)`: Define a arquitetura do processador
+- `set(CROSS_COMPILE arm-none-eabi-)`: Prefixo das ferramentas ARM
+
+**Flags de compilação:**
+```cmake
+# Flags específicas do Cortex-M4
+set(CPU_FLAGS "-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard")
+set(COMMON_FLAGS "${CPU_FLAGS} -Wall -Wextra -Wno-unused-parameter")
+
+# Flags de Debug
+set(CMAKE_C_FLAGS_DEBUG "${COMMON_FLAGS} -g3 -O0 -DDEBUG")
+```
+
+**Flags explicadas:**
+- `-mcpu=cortex-m4`: Especifica o processador Cortex-M4
+- `-mthumb`: Usa instruction set Thumb (mais eficiente)
+- `-mfpu=fpv4-sp-d16`: Habilita FPU de precisão simples
+- `-mfloat-abi=hard`: Usa hardware FPU para operações de ponto flutuante
+- `-Wall -Wextra`: Habilita todos os warnings
+- `-g3`: Informações de debug máximas
+- `-O0`: Sem otimização (melhor para debug)
+- `-DDEBUG`: Define macro DEBUG
+
+**Definições do STM32:**
+```cmake
+add_definitions(-DUSE_FULL_LL_DRIVER -DSTM32F411xE -DHSE_VALUE=8000000U)
+```
+
+**Definições explicadas:**
+- `-DUSE_FULL_LL_DRIVER`: Usa drivers LL (Low Layer) completos
+- `-DSTM32F411xE`: Define o modelo específico do STM32
+- `-DHSE_VALUE=8000000U`: Define valor do cristal externo (8MHz)
+
+**Arquivos e diretórios:**
+```cmake
+# Diretórios de include
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/Inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/CMSIS/Device/ST/STM32F4xx/Include
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/STM32F4xx_HAL_Driver/Inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/CMSIS/Include
+)
+
+# Arquivos fonte
+set(SOURCES
+    Src/main.c
+    Src/stm32f4xx_it.c
+    Src/system_stm32f4xx.c
+    Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_ll_gpio.c
+    Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_ll_utils.c
+)
+```
+
+**Linker e pós-compilação:**
+```cmake
+# Linker script (mapa de memória)
+target_link_options(${PROJECT_NAME}.elf PRIVATE
+    -T${LINKER_SCRIPT}
+    -Wl,-Map=${PROJECT_NAME}.map
+    -Wl,--gc-sections
+    --specs=nano.specs
+    --specs=nosys.specs
+)
+
+# Geração de arquivos adicionais
+add_custom_command(TARGET ${PROJECT_NAME}.elf POST_BUILD
+    COMMAND ${CMAKE_OBJCOPY} -O ihex ${PROJECT_NAME}.elf ${PROJECT_NAME}.hex
+    COMMAND ${CMAKE_OBJCOPY} -O binary ${PROJECT_NAME}.elf ${PROJECT_NAME}.bin
+    COMMAND ${CMAKE_SIZE} ${PROJECT_NAME}.elf
+)
+```
+
+**Comandos explicados:**
+- `-T${LINKER_SCRIPT}`: Usa o script de linker específico do STM32
+- `-Wl,-Map=${PROJECT_NAME}.map`: Gera arquivo de mapa de memória
+- `-Wl,--gc-sections`: Remove código não utilizado
+- `--specs=nano.specs`: Usa biblioteca Newlib Nano (menor)
+- `--specs=nosys.specs`: Sem syscalls (sem sistema operacional)
+- `objcopy -O ihex`: Converte ELF para formato Intel HEX
+- `objcopy -O binary`: Converte ELF para binário puro
+- `size`: Mostra tamanho das seções do programa
+
+**Targets customizados CMake:**
+```cmake
+# Target para flash
+add_custom_target(flash
+    COMMAND openocd -f interface/stlink.cfg -f target/stm32f4x.cfg \
+            -c "program ${PROJECT_NAME}.elf verify reset exit"
+    DEPENDS ${PROJECT_NAME}.elf
+)
+
+# Target para debug
+add_custom_target(debug
+    COMMAND openocd -f interface/stlink.cfg -f target/stm32f4x.cfg
+)
+
+# Target para GDB
+add_custom_target(gdb
+    COMMAND ${CROSS_COMPILE}gdb ${PROJECT_NAME}.elf \
+            -ex "target remote localhost:3333" \
+            -ex "monitor reset init"
+    DEPENDS ${PROJECT_NAME}.elf
+)
+```
+
+**Uso dos targets CMake:**
+```bash
+# Build manual com CMake
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+make -j$(nproc)
+
+# Usar targets customizados
+make flash    # Equivalente a ./flash.sh
+make debug    # Inicia OpenOCD
+make gdb      # Inicia GDB com conexão automática
+```
+
 ## Iniciando a Sessão de Debug
 
-### Método 1: Script Automático
+### Método 1: Script Automático (Recomendado para Iniciantes)
 
 ```bash
 # Inicia OpenOCD e GDB automaticamente
 ./debug.sh
 ```
 
-### Método 2: Manual
+**O que acontece:**
+1. Verifica se OpenOCD e GDB estão instalados
+2. Inicia OpenOCD em background na porta 3333
+3. Conecta GDB automaticamente ao OpenOCD
+4. Reseta o microcontrolador
+5. Deixa pronto para debug
+
+### Método 2: Manual (Para Entender o Processo)
 
 ```bash
 # Terminal 1: Iniciar OpenOCD
@@ -126,12 +425,22 @@ arm-none-eabi-gdb GPIO_InfiniteLedToggling.elf
 (gdb) load
 ```
 
+**Comandos explicados:**
+- `openocd -f interface/stlink.cfg -f target/stm32f4x.cfg`: Inicia servidor de debug
+- `target remote localhost:3333`: Conecta GDB ao servidor OpenOCD
+- `monitor reset init`: Reseta e inicializa o microcontrolador
+- `load`: Grava o programa no microcontrolador
+
 ### Método 3: Usando gdbinit
 
 ```bash
 cd build
 arm-none-eabi-gdb -x ../gdbinit GPIO_InfiniteLedToggling.elf
 ```
+
+**O que acontece:**
+- `-x ../gdbinit`: Carrega comandos automáticos do arquivo gdbinit
+- Útil para configurações personalizadas de debug
 
 ## Cenários de Depuração Detalhados
 
