@@ -1,6 +1,21 @@
 # GPIO Infinite Led Toggling - Projeto STM32F411RETx
 
+![visitors](https://visitor-badge.laobi.icu/badge?page_id=ArvoreDosSaberes.Tutorial_GDB_GPIO_InfiniteLedToggling)
+[![License: CC BY-SA 4.0](https://img.shields.io/badge/License-CC_BY--SA_4.0-blue.svg)](https://creativecommons.org/licenses/by-sa/4.0/)
+![Language: Portuguese](https://img.shields.io/badge/Language-Portuguese-brightgreen.svg)
+![STM32](https://img.shields.io/badge/STM32-F411RETx-blue)
+![GDB](https://img.shields.io/badge/GDB-Debug-orange)
+![Status](https://img.shields.io/badge/Status-Tutorial-brightgreen)
+![Repository Size](https://img.shields.io/github/repo-size/ArvoreDosSaberes/Tutorial_GDB_GPIO_InfiniteLedToggling)
+![Last Commit](https://img.shields.io/github/last-commit/ArvoreDosSaberes/Tutorial_GDB_GPIO_InfiniteLedToggling)
+
 Este projeto demonstra como configurar e usar GPIOs no STM32F411RETx para piscar LEDs, baseado no exemplo oficial STMicroelectronics com enhancements modernos. O projeto usa a LL API para otimização de performance e tamanho, e inclui suporte completo para compilação, gravação e depuração usando CMake, OpenOCD e GDB.
+
+## Objetivo do Repositório
+
+Este repositório foi criado para ser usado em um artigo tutorial no site **https://mcu.tec.br**, onde será apresentado um tutorial completo de como usar o GDB para depuração de sistemas embarcados com STM32. O link específico do artigo será informado posteriormente.
+
+O projeto serve como exemplo prático para demonstrar técnicas avançadas de depuração usando GDB, incluindo breakpoints, monitoramento de registradores, análise de timing e troubleshooting de problemas comuns em desenvolvimento de firmware.
 
 ## Características
 
@@ -329,11 +344,12 @@ Este projeto é baseado nos exemplos STMicroelectronics e mantém a mesma licen�
 ## Contribuições
 
 Contribuições são bem-vindas! Por favor:
-1. Faça fork do projeto
+1. Faça fork do projeto em https://github.com/ArvoreDosSaberes/Tutorial_GDB_GPIO_InfiniteLedToggling
 2. Crie branch para sua feature
 3. Faça commit das mudanças
 4. Abra Pull Request
 
 ---
 
+**Repositório: https://github.com/ArvoreDosSaberes/Tutorial_GDB_GPIO_InfiniteLedToggling**
 **Desenvolvido para comunidade mcu.tec.br**
